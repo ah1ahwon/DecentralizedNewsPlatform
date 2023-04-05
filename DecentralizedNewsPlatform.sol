@@ -1,36 +1,125 @@
 pragma solidity ^0.8.0;
 
 contract DecentralizedNewsPlatform {
+    address private owner; // 계약 소유자 주소
+    uint public articleCount = 0; // 등록된 기사 수
+    uint public commentCount = 0; // 등록된 댓글 수
     
-    struct News {
-        address author;
+    struct Article {
+        uint id;
         string title;
         string content;
-        uint votes;
-        bool isVerified;
-        bool exists;
+        uint timestamp;
+        uint likes;
+        uint dislikes;
+        address author;
     }
     
-    mapping (bytes32 => News) private newsList; // Mapping to store the news
-    
-    function addNews(string memory _title, string memory _content) public {
-        bytes32 hash = keccak256(abi.encodePacked(msg.sender, _title, _content)); // Hash the news
-        require(!newsList[hash].exists, "News already exists!"); // Check if the news already exists
-        News memory newNews = News(msg.sender, _title, _content, 0, false, true); // Create a new News struct
-        newsList[hash] = newNews; // Add the news to the mapping
+    struct Comment {
+        uint id;
+        string content;
+        uint timestamp;
+        uint likes;
+        uint dislikes;
+        address author;
+        uint articleId;
     }
     
-    function verifyNews(bytes32 _hash) public {
-        require(newsList[_hash].exists, "News does not exist!"); // Check if the news exists
-        require(msg.sender != newsList[_hash].author, "Author cannot verify their own news!"); // Check if the author is not verifying their own news
-        require(!newsList[_hash].isVerified, "News is already verified!"); // Check if the news is not already verified
-        newsList[_hash].votes++; // Increment the vote count
-        if (newsList[_hash].votes >= 3) { // If the votes reach 3
-            newsList[_hash].isVerified = true; // Verify the news
-        }
+    mapping (uint => Article) public articles; // 기사 정보 저장용 매핑
+    mapping (uint => Comment) public comments; // 댓글 정보 저장용 매핑
+    
+    constructor() {
+        owner = msg.sender;
     }
     
-    function getNews(bytes32 _hash) public view returns(address, string memory, string memory, uint, bool, bool) {
-        return (newsList[_hash].author, newsList[_hash].title, newsList[_hash].content, newsList[_hash].votes, newsList[_hash].isVerified, newsList[_hash].exists);
+    // 기사 등록 함수
+    function postArticle(string memory _title, string memory _content) public {
+        require(bytes(_title).length > 0 && bytes(_content).length > 0, "Title or content cannot be empty.");
+        
+        articleCount++;
+        articles[articleCount] = Article(articleCount, _title, _content, block.timestamp, 0, 0, msg.sender);
+    }
+    
+    // 기사 수정 함수
+    function updateArticle(uint _articleId, string memory _content) public {
+        require(articles[_articleId].id != 0, "Article not found.");
+        require(msg.sender == articles[_articleId].author, "Only the author can update the article.");
+        
+        articles[_articleId].content = _content;
+    }
+    
+    // 기사 삭제 함수
+    function deleteArticle(uint _articleId) public {
+        require(articles[_articleId].id != 0, "Article not found.");
+        require(msg.sender == articles[_articleId].author, "Only the author can delete the article.");
+        
+        delete articles[_articleId];
+        articleCount--;
+    }
+    
+    // 댓글 등록 함수
+    function postComment(string memory _content, uint _articleId) public {
+        require(bytes(_content).length > 0, "Comment cannot be empty.");
+        require(articles[_articleId].id != 0, "Article not found.");
+        
+        commentCount++;
+        comments[commentCount] = Comment(commentCount, _content, block.timestamp, 0, 0, msg.sender, _articleId);
+    }
+    
+    // 댓글 수정 함수
+    function updateComment(uint _commentId,
+    string memory _content) public {
+    require(comments[_commentId].id != 0, "Comment not found.");
+    require(msg.sender == comments[_commentId].author, "Only the author can update the comment.");
+    
+    comments[_commentId].content = _content;
+    }
+
+    // 댓글 삭제 함수
+    function deleteComment(uint _commentId) public {
+        require(comments[_commentId].id != 0, "Comment not found.");
+        require(msg.sender == comments[_commentId].author, "Only the author can delete the comment.");
+        
+        delete comments[_commentId];
+        commentCount--;
+    }
+
+    // 기사 좋아요 함수
+    function likeArticle(uint _articleId) public {
+        require(articles[_articleId].id != 0, "Article not found.");
+        require(msg.sender != articles[_articleId].author, "Author cannot like own article.");
+        
+        articles[_articleId].likes++;
+    }
+
+    // 기사 싫어요 함수
+    function dislikeArticle(uint _articleId) public {
+        require(articles[_articleId].id != 0, "Article not found.");
+        require(msg.sender != articles[_articleId].author, "Author cannot dislike own article.");
+        
+        articles[_articleId].dislikes++;
+    }
+
+    // 댓글 좋아요 함수
+    function likeComment(uint _commentId) public {
+        require(comments[_commentId].id != 0, "Comment not found.");
+        require(msg.sender != comments[_commentId].author, "Author cannot like own comment.");
+        
+        comments[_commentId].likes++;
+    }
+
+    // 댓글 싫어요 함수
+    function dislikeComment(uint _commentId) public {
+        require(comments[_commentId].id != 0, "Comment not found.");
+        require(msg.sender != comments[_commentId].author, "Author cannot dislike own comment.");
+        
+        comments[_commentId].dislikes++;
+    }
+
+    // 계약 소유자 전용 함수
+    function kill() public {
+        require(msg.sender == owner, "Only contract owner can kill the contract.");
+        
+        selfdestruct(payable(owner));
     }
 }
